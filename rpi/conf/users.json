@@ -1,7 +1,8 @@
 {
-	"<CARDID>": {
-		"<ZONE>": "Yes",
-		"Name": "<NAME>"
+	"<id>": {
+		"<zone>": "Yes",
+		"Name": "<name>",
+		"Locker": "<locker>"
 	}
 }
 

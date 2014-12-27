@@ -1,4 +1,10 @@
 {
-	"zone": "<ZONE>"
+	"maindoor": {
+		"Active": "High",
+		"Relay": "<relay>"
+	},
+	"locker": {
+		"Active": "Low"
+	}
 }
 

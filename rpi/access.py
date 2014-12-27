@@ -5,27 +5,57 @@ import subprocess
 
 import json
 
-json_config = open("/root/ac/conf/config.json");
-config = json.load(json_config);
-json_config.close();
+json_zone = open("/root/ac/conf/zone.json");
+jzone = json.load(json_zone);
+json_zone.close();
 
-zone = config["zone"];
+zone = jzone["zone"];
 
 json_users = open("/root/ac/conf/users.json");
 users = json.load(json_users);
 json_users.close();
 
+json_config = open("/root/ac/conf/config.json");
+config = json.load(json_config);
+json_config.close();
+
+json_locker = open("/root/ac/conf/locker.json");
+locker = json.load(json_locker);
+json_locker.close();
+
+if (zone == "locker"):
+	lockerzone = jzone["lockerzone"]
+
+# initialize some variables, should do this in a def.
+active = config[zone]["Active"]
+if (active != "High" and active != "Low"):
+	print ("Invalid active directive for zone " + zone)
+	sys.exit(0)
+
 GPIO.setmode(GPIO.BCM)
 
-relay = 4
-
-GPIO.setup(relay, GPIO.OUT)
-
-def triggerRelay():
-	GPIO.output(relay, True);
-	time.sleep(0.1);
-	GPIO.output(relay, False);
-	time.sleep(5);
+def initGPIO():
+	if (zone == "locker"):
+		for relay in iter(locker):
+			r = int(locker[relay]["Relay"])
+			GPIO.setup(r, GPIO.OUT)
+			GPIO.output(r, True)
+	else :
+		r = int(config[zone]["Relay"])
+		GPIO.setup(r, GPIO.OUT)
+		GPIO.output(r, False)
+		
+	
+def triggerRelay(r):
+	relay = int(r)
+	if (zone == "locker"):
+		GPIO.output(relay, False)
+		time.sleep(2)
+		GPIO.output(relay, True)
+	else:
+		GPIO.output(relay, True)
+		time.sleep(0.1)
+		GPIO.output(relay, False)
 
 def decodeStr( line ):
 	tbstr = line.split(" : ")[1]
@@ -64,7 +94,9 @@ def decodeStr( line ):
 
 	return int(id, 2)
 
-daemon.daemonize("/var/run/access.pid")
+initGPIO()
+
+#daemon.daemonize("/var/run/access.pid")
 
 proc = subprocess.Popen(['/root/ac/wiegand'],stdout=subprocess.PIPE)
 try:
@@ -77,8 +109,15 @@ try:
 		retstr = str(ret)
 		if (users.get(retstr) is None):
 			continue
-		if (users[retstr][zone] == "Yes"):
-			triggerRelay()
+		if (zone != "locker"):
+			if (users[retstr][zone] == "Yes"):
+				triggerRelay(config[zone]["Relay"])
+		else:
+			if (users[retstr].get("locker") is None):
+				continue
+			userlocker = users[retstr]["locker"]
+			if (locker[userlocker]["Zone"] == lockerzone):
+				triggerRelay(locker[userlocker]["Relay"])
 except:
 	proc.terminate()
 

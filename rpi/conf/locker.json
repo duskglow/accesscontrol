@@ -1,0 +1,18 @@
+{
+	"1": {
+		"Relay": "4",
+		"Zone": "locker1"
+	},
+	"2": {
+		"Relay": "17",
+		"Zone": "locker1"
+	},
+	"3": {
+		"Relay": "27",
+		"Zone": "locker1"
+	},
+	"4": {
+		"Relay": "22",
+		"Zone": "locker1"
+	}
+}
