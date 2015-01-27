@@ -1,25 +1,28 @@
-import daemon
+#!/usr/bin/python
+#import daemon	# This is not used anymore
 import RPi.GPIO as GPIO
 import sys,time
 import subprocess
 
 import json
 
-json_zone = open("/root/ac/conf/zone.json");
+conf_dir = './conf/'
+
+json_zone = open(conf_dir + 'zone.json');
 jzone = json.load(json_zone);
 json_zone.close();
 
 zone = jzone["zone"];
 
-json_users = open("/root/ac/conf/users.json");
+json_users = open(conf_dir + 'users.json');
 users = json.load(json_users);
 json_users.close();
 
-json_config = open("/root/ac/conf/config.json");
+json_config = open(conf_dir + 'config.json');
 config = json.load(json_config);
 json_config.close();
 
-json_locker = open("/root/ac/conf/locker.json");
+json_locker = open(conf_dir + 'locker.json');
 locker = json.load(json_locker);
 json_locker.close();
 
@@ -46,7 +49,7 @@ def initGPIO():
 		GPIO.output(r, False)
 		
 	
-def triggerRelay(r):
+def triggerRelay(r, open_hours=False):
 	relay = int(r)
 	if (zone == "locker"):
 		GPIO.output(relay, False)
@@ -54,6 +57,8 @@ def triggerRelay(r):
 		GPIO.output(relay, True)
 	else:
 		GPIO.output(relay, True)
+		if (open_hours):
+			return True
 		time.sleep(0.1)
 		GPIO.output(relay, False)
 
@@ -98,6 +103,9 @@ initGPIO()
 
 #daemon.daemonize("/var/run/access.pid")
 
+retstr = ''
+repeat_read_timeout = time.time()
+repeat_read_count = 0
 proc = subprocess.Popen(['/root/ac/wiegand'],stdout=subprocess.PIPE)
 try:
 	for line in iter(proc.stdout.readline, ''):
@@ -106,12 +114,24 @@ try:
 			#print("Received an invalid or corrupted line")
 			continue
 	
+		last_id = retstr
 		retstr = str(ret)
 		if (users.get(retstr) is None):
 			continue
+		now = time.time()
+		if (retstr == last_id and now <= repeat_read_timeout):
+			repeat_read_count += 1
+		else:
+			repeat_read_count = 0
+			repeat_read_timeout = now + 120
 		if (zone != "locker"):
 			if (users[retstr][zone] == "Yes"):
-				triggerRelay(config[zone]["Relay"])
+				if (repeat_read_count >= 3):
+					open_hours = True
+					repeat_read_count = 0
+				else:
+					open_hours = False
+				triggerRelay(config[zone]["Relay"], open_hours)
 		else:
 			if (users[retstr].get("locker") is None):
 				continue
@@ -119,6 +139,7 @@ try:
 			if (locker[userlocker]["Zone"] == lockerzone):
 				triggerRelay(locker[userlocker]["Relay"])
 except:
+	print "Exception!"
 	proc.terminate()
 
 GPIO.cleanup()
