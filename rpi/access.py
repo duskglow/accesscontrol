@@ -5,6 +5,7 @@ import sys,time
 import subprocess
 
 import json
+import smtplib
 
 conf_dir = './conf/'
 
@@ -99,6 +100,22 @@ def decodeStr( line ):
 
 	return int(id, 2)
 
+def send_email( subject, body ):
+	try:
+		emailfrom = config["emailfrom"]
+		to = config["emailto"]
+		server = config["emailserver"]
+		port = int(config["emailport"])
+		smtpserver = smtplib.SMTP(server, port)
+		smtpserver.ehlo()
+		header = 'To: ' + to + '\nFrom: ' + emailfrom + '\nSubject: ' + subject + '\n'
+		msg = header + '\n' + body + ' \n\n'
+		smtpserver.sendmail(emailfrom, to, msg)
+		smtpserver.close()
+	except smtplib.SMTPException:
+		# couldn't send.
+		pass	
+
 initGPIO()
 
 #daemon.daemonize("/var/run/access.pid")
@@ -106,6 +123,7 @@ initGPIO()
 retstr = ''
 repeat_read_timeout = time.time()
 repeat_read_count = 0
+open_hours = False
 proc = subprocess.Popen(['/root/ac/wiegand'],stdout=subprocess.PIPE)
 try:
 	for line in iter(proc.stdout.readline, ''):
@@ -129,17 +147,23 @@ try:
 				if (repeat_read_count >= 3):
 					open_hours = True
 					repeat_read_count = 0
+					send_email("DOOR IS LOCKED OPEN", "")
 				else:
+					if (open_hours == True):
+						send_email("DOOR IS NORMAL", "")
 					open_hours = False
 				triggerRelay(config[zone]["Relay"], open_hours)
+				subject = users[retstr].get("Name") + " has entered zone " + zone
+				body = "Allowed user " + users[retstr].get("Name")
+				send_email(subject, body)
 		else:
 			if (users[retstr].get("locker") is None):
 				continue
 			userlocker = users[retstr]["locker"]
 			if (locker[userlocker]["Zone"] == lockerzone):
 				triggerRelay(locker[userlocker]["Relay"])
-except:
-	print "Exception!"
+except Exception as inst:
+	print inst
 	proc.terminate()
 
 GPIO.cleanup()

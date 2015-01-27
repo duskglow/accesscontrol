@@ -1,4 +1,8 @@
 {
+	"emailfrom": "",
+	"emailto": "",
+	"emailserver": "",
+	"emailport": "",
 	"maindoor": {
 		"Active": "High",
 		"Relay": "<relay>"
