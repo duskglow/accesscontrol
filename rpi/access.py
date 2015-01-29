@@ -135,6 +135,9 @@ try:
 		last_id = retstr
 		retstr = str(ret)
 		if (users.get(retstr) is None):
+			subject = "Card " + retstr + " presented and access was denied."
+			body = ""
+			send_email(subject, body)
 			continue
 		now = time.time()
 		if (retstr == last_id and now <= repeat_read_timeout):
@@ -153,8 +156,15 @@ try:
 						send_email("DOOR IS NORMAL", "")
 					open_hours = False
 				triggerRelay(config[zone]["Relay"], open_hours)
-				subject = users[retstr].get("Name") + " has entered zone " + zone
-				body = "Allowed user " + users[retstr].get("Name")
+				name = users[retstr].get("Name")
+				first, last = name.split(" ");
+				lastinitial = last[0];
+				subject = first + " " + lastinitial + ". has entered zone " + zone
+				body = ""
+				send_email(subject, body)
+			else:
+				subject = "Card " + retstr + " presented and access was denied."
+				body = ""
 				send_email(subject, body)
 		else:
 			if (users[retstr].get("locker") is None):
