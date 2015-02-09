@@ -1,0 +1,7 @@
+#
+# Run the start script once a minute to make sure that access.py is
+# running.
+#
+# Move this file to /etc/cron.d/access
+
+* * * * * root /root/ac/start.sh
