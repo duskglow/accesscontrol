@@ -6,8 +6,9 @@ things up physically may require more poking around.
 # wiringPi
 ###
 
-$ git clone git://git.drogon.net/wiringPi
-$ cd wiringPi
+$ cd ..
+$ git submodule update --init --recursive
+$ cd rpi/wiringPi
 $ ./build
 $ cd ..
 
