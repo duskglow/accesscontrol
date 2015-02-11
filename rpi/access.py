@@ -89,7 +89,7 @@ def decodeStr(line):
     debug(line.rstrip())
     debug("%i %i %i %i" % (lparity, facility, user_id, rparity))
     # check parity
-    calculated_lparity = 1
+    calculated_lparity = 0
     calculated_rparity = 1
     for iter in range(0, 12):
         calculated_lparity ^= int(lpstr[iter])
@@ -154,7 +154,7 @@ def process_wiegand_line(line):
             first, last = users[card_id]["Name"].split(" ")
             report("%s %s. has entered %s" % (first, last[0], zone))
         else:
-            report("Card %s presented at %s and access was denied" % (card_id, zone))
+            report("A card was presented at %s and access was denied" % zone)
     else:
         if (users[card_id]["locker"] is None):
             return
