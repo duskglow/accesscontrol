@@ -4,14 +4,18 @@
         "#": "Leave emailserver blank and no emails will be sent",
 	"emailserver": "",
 	"emailport": 25,
+	"locker": {
+		"Active": 0,
+                "open_delay": 2
+	},
+        "<zone>": {
+		"Active": "<1|0: GPIO active high = 1, active low = 0>",
+                "open_delay": "<seconds to unlock door for>",
+		"Relay": "<GPIO number>"
+        },
 	"maindoor": {
 		"Active": 1,
                 "open_delay": 0.1,
 		"Relay": 18
-	},
-	"locker": {
-		"Active": 0,
-                "open_delay": 2
 	}
 }
-

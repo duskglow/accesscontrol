@@ -3,6 +3,10 @@
 		"<zone>": "Yes",
 		"Name": "<name>",
 		"Locker": "<locker>"
+	},
+	"5": {
+		"maindoor": "Yes",
+		"Name": "John Doe",
+		"Locker": "3"
 	}
 }
-
