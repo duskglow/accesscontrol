@@ -1,14 +1,17 @@
 {
-	"emailfrom": "",
-	"emailto": "",
+	"emailfrom": "access@yourdomain.com",
+	"emailto": "you@yourdomain.com",
+        "#": "Leave emailserver blank and no emails will be sent",
 	"emailserver": "",
-	"emailport": "",
+	"emailport": 25,
 	"maindoor": {
-		"Active": "High",
-		"Relay": "<relay>"
+		"Active": 1,
+                "open_delay": 0.1,
+		"Relay": 18
 	},
 	"locker": {
-		"Active": "Low"
+		"Active": 0,
+                "open_delay": 2
 	}
 }
 
