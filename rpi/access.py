@@ -11,7 +11,7 @@ import smtplib
 import threading
 import syslog
 
-debug_mode = True
+debug_mode = False
 conf_dir = "./conf/"
 
 def initialize():
@@ -27,6 +27,8 @@ def initialize():
     # These signals will reload users
     signal.signal(signal.SIGHUP, rehash)    # killall -HUP python
     signal.signal(signal.SIGUSR2, rehash)   # killall -USR2 python
+    # This one will toggle debug messages
+    signal.signal(signal.SIGWINCH, toggle_debug)    # killall -WINCH python
     report("%s access control is online" % zone)
 
 def report(subject):
@@ -225,6 +227,14 @@ def open_door(user):
         else:
             unlock_briefly(config[zone]["latch_gpio"])
             report("%s has entered %s" % (name, zone))
+
+def toggle_debug(a=None, b=None):
+    global debug_mode
+    if debug_mode:
+        debug("Disabling debug messages")
+    debug_mode ^= True
+    if debug_mode:
+        debug("Enabling debug messages")
 
 def cleanup(a=None, b=None):
     message = ""
