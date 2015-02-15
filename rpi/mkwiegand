@@ -1,4 +1,0 @@
-#!/bin/bash
-
-gcc -o wiegand -lwiringPi -lrt -lpthread wiegand.c
-

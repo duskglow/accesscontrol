@@ -1,25 +1,6 @@
 Do all the things below and stuff might work.  Figuring out how to hook
 things up physically may require more poking around.
 
-
-###
-# wiringPi
-###
-
-$ cd ..
-$ git submodule update --init --recursive
-$ cd rpi/wiringPi
-$ ./build
-$ cd ..
-
-
-###
-# wiegand
-###
-
-$ sh mkwiegand
-
-
 ###
 # RPi.GPIO
 ###
