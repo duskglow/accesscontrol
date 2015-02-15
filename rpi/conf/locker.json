@@ -1,18 +1,18 @@
 {
 	"1": {
-		"Relay": "4",
-		"Zone": "locker1"
+		"latch_gpio": 4,
+		"zone": "locker1"
 	},
 	"2": {
-		"Relay": "17",
-		"Zone": "locker1"
+		"latch_gpio": 17,
+		"zone": "locker1"
 	},
 	"3": {
-		"Relay": "27",
-		"Zone": "locker1"
+		"latch_gpio": 27,
+		"zone": "locker1"
 	},
 	"4": {
-		"Relay": "22",
-		"Zone": "locker1"
+		"latch_gpio": 22,
+		"zone": "locker1"
 	}
 }

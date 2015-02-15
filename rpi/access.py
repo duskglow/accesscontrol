@@ -11,96 +11,34 @@ import smtplib
 import threading
 import syslog
 
-debug_mode = False
+debug_mode = True
 conf_dir = "./conf/"
-GPIO.setmode(GPIO.BCM)
-syslog.openlog("accesscontrol", syslog.LOG_PID, syslog.LOG_AUTH)
-syslog.syslog("Initializing")
 
-# Globalize some variables for later
-zone = None
-users = None
-config = None
-active = None
-locker = None
-lockerzone = None
-open_hours = False
-
-def load_json(filename):
-    file_handle = open(filename)
-    config = json.load(file_handle)
-    file_handle.close()
-    return config
-
-def read_configs():
-    global zone, users, config, locker, lockerzone, active
-    jzone = load_json(conf_dir + "zone.json")
-    users = load_json(conf_dir + "users.json")
-    config = load_json(conf_dir + "config.json")
-    locker = load_json(conf_dir + "locker.json")
-    zone = jzone["zone"]
-    lockerzone = jzone["lockerzone"]
-    active = config[zone]["Active"]
-
-def init_GPIO(gpio):
-    GPIO.setup(gpio, GPIO.OUT)
-    GPIO.output(gpio, active^1)
-
-def setup_GPIOs():
-    if (zone == "locker"):
-        for number in iter(locker):
-            init_GPIO(locker[number]["Relay"])
-    else:
-        init_GPIO(config[zone]["Relay"])
-
-def rehash(a=None, b=None):
-    report("Reloading configuration files")
+def initialize():
+    GPIO.setmode(GPIO.BCM)
+    syslog.openlog("accesscontrol", syslog.LOG_PID, syslog.LOG_AUTH)
+    report("Initializing")
     read_configs()
-    setup_GPIOs()
+    setup_output_GPIOs()
+    setup_readers()
+    # Catch some exit signals
+    signal.signal(signal.SIGINT, cleanup)   # Ctrl-C
+    signal.signal(signal.SIGTERM, cleanup)  # killall python
+    # These signals will reload users
+    signal.signal(signal.SIGHUP, rehash)    # killall -HUP python
+    signal.signal(signal.SIGUSR2, rehash)   # killall -USR2 python
+    report("%s access control is online" % zone)
 
-def triggerRelay(gpio_number, leave_open=False):
-    gpio_number = gpio_number
-    GPIO.output(gpio_number, active)
-    if leave_open:
-        return True
-    time.sleep(config[zone]["open_delay"])
-    GPIO.output(gpio_number, active^1)
+def report(subject):
+    syslog.syslog(subject)
+    debug(subject)
+    if config and config.get("emailserver"):
+        t = threading.Thread(target=send_email, args=(subject))
+        t.start()
 
 def debug(message):
     if debug_mode:
         print message
-
-def decodeStr(line):
-    tbstr = line.split(" : ")[1]
-    tbstr = tbstr.rstrip()
-    bstr = tbstr[0:24] + tbstr[30:]
-
-    if len(bstr) != 26:
-        debug("Incorrect string length received: %i" % len(bstr))
-        debug(":%s:" % bstr)
-        return -1
-    lparity = int(bstr[0])
-    facility = int(bstr[1:9], 2)
-    user_id = int(bstr[9:25], 2)
-    rparity = int(bstr[25])
-    lpstr = bstr[1:13]
-    rpstr = bstr[13:25]
-
-    debug(line.rstrip())
-    debug("%i %i %i %i" % (lparity, facility, user_id, rparity))
-    # check parity
-    calculated_lparity = 0
-    calculated_rparity = 1
-    for iter in range(0, 12):
-        calculated_lparity ^= int(lpstr[iter])
-        calculated_rparity ^= int(rpstr[iter])
-    if (calculated_lparity != lparity or calculated_rparity != rparity):
-        debug("Parity error in received string!")
-        return -1
-
-    user_id = str(user_id)
-    debug("Successfully decoded id %s" % user_id)
-    return user_id
 
 def send_email(subject, body=""):
     try:
@@ -116,78 +54,200 @@ def send_email(subject, body=""):
         # couldn't send.
         pass
 
-def report(subject):
-    syslog.syslog(subject)
-    if config and config.get("emailserver"):
-        t = threading.Thread(target=send_email, args=(subject,))
-        t.start()
+def rehash(signal=None, b=None):
+    global users
+    report("Reloading access list")
+    users = load_json(conf_dir + "users.json")
 
-def process_wiegand_line(line):
-    global card_id, repeat_read_timeout, repeat_read_count, open_hours
+def read_configs():
+    global zone, users, config, locker, lockerzone
+    jzone = load_json(conf_dir + "zone.json")
+    users = load_json(conf_dir + "users.json")
+    config = load_json(conf_dir + "config.json")
+    zone = jzone["zone"]
+    if zone == "locker":
+        lockerzone = jzone["lockerzone"]
+        locker = load_json(conf_dir + "locker.json")
 
-    last_id = card_id
-    card_id = decodeStr(line)
-    if (card_id == -1):
-        debug("Received an invalid or corrupted line")
+def load_json(filename):
+    file_handle = open(filename)
+    config = json.load(file_handle)
+    file_handle.close()
+    return config
+
+def setup_output_GPIOs():
+    if (zone == "locker"):
+        for number in iter(locker):
+            gpio = locker[number]["latch_gpio"]
+            zone_by_pin[gpio] = "locker"
+            init_GPIO(gpio)
+    else:
+        zone_by_pin[config[zone]["latch_gpio"]] = zone
+        init_GPIO(config[zone]["latch_gpio"])
+
+def init_GPIO(gpio):
+    GPIO.setup(gpio, GPIO.OUT)
+    lock(gpio)
+
+def lock(gpio):
+    GPIO.output(gpio, active(gpio)^1)
+
+def unlock(gpio):
+    GPIO.output(gpio, active(gpio))
+
+def active(gpio):
+    zone = zone_by_pin[gpio]
+    return config[zone]["unlock_value"]
+
+def unlock_briefly(gpio):
+    unlock(gpio)
+    time.sleep(config[zone]["open_delay"])
+    lock(gpio)
+
+def setup_readers():
+    global zone_by_pin
+    for name in iter(config):
+        if (type(config[name]) is dict and config[name].get("d0")
+                                       and config[name].get("d1")):
+            reader = config[name]
+            reader["stream"] = ""
+            reader["timer"] = None
+            reader["name"] = name
+            reader["unlocked"] = False
+            zone_by_pin[reader["d0"]] = name
+            zone_by_pin[reader["d1"]] = name
+            GPIO.setup(reader["d0"], GPIO.IN)
+            GPIO.setup(reader["d1"], GPIO.IN)
+            GPIO.add_event_detect(reader["d0"], GPIO.FALLING,
+                                  callback=data_pulse)
+            GPIO.add_event_detect(reader["d1"], GPIO.FALLING,
+                                  callback=data_pulse)
+
+def data_pulse(channel):
+    reader = config[zone_by_pin[channel]]
+    if channel == reader["d0"]:
+        reader["stream"] += "0"
+    elif channel == reader["d1"]:
+        reader["stream"] += "1"
+    kick_timer(reader)
+
+def kick_timer(reader):
+    if reader["timer"] is None:
+        reader["timer"] = threading.Timer(0.2, wiegand_stream_done,
+                                          args=[reader])
+        reader["timer"].start()
+
+def wiegand_stream_done(reader):
+    if reader["stream"] == "":
         return
-    if (users.get(card_id) is None):
-        report("Card %s presented at %s and access was denied" % (card_id, zone))
-        return
+    bitstring = reader["stream"]
+    reader["stream"] = ""
+    reader["timer"] = None
+    validate_bits(bitstring)
 
+def validate_bits(bstr):
+    if len(bstr) != 26:
+        debug("Incorrect string length received: %i" % len(bstr))
+        debug(":%s:" % bstr)
+        return False
+    lparity = int(bstr[0])
+    facility = int(bstr[1:9], 2)
+    user_id = int(bstr[9:25], 2)
+    rparity = int(bstr[25])
+    debug("%s is: %i %i %i %i" % (bstr, lparity, facility, user_id, rparity))
+
+    calculated_lparity = 0
+    calculated_rparity = 1
+    for iter in range(0, 12):
+        calculated_lparity ^= int(bstr[iter+1])
+        calculated_rparity ^= int(bstr[iter+13])
+    if (calculated_lparity != lparity or calculated_rparity != rparity):
+        debug("Parity error in received string!")
+        return False
+
+    card_id = "%08x" % int(bstr, 2)
+    debug("Successfully decoded %s facility=%i user=%i" %
+          (card_id, facility, user_id))
+    lookup_card(card_id, str(facility), str(user_id))
+
+def lookup_card(card_id, facility, user_id):
+    user = (users.get("%s,%s" % (facility, user_id)) or
+            users.get(card_id) or
+            users.get(user_id))
+    if (user is None):
+        debug("couldn't find user")
+        return reject_card()
+    if (zone == "locker" and user.get("locker")):
+        open_locker(user)
+    elif (user.get(zone) and user[zone] == "Yes"):
+        open_door(user)
+    else:
+        debug("user isn't authorized for this zone")
+        reject_card()
+
+def reject_card():
+    report("A card was presented at %s and access was denied" % zone)
+    return False
+
+def open_locker(user):
+    userlocker = user["locker"]
+    if locker.get(userlocker) is None:
+        return debug("%s's locker does not exist" % user["name"])
+    if (locker[userlocker]["zone"] == lockerzone):
+        report("%s has opened their locker" % public_name(user))
+        unlock_briefly(locker[userlocker]["latch_gpio"])
+
+def public_name(user):
+    first, last = user["name"].split(" ")
+    return "%s %s." % (first, last[0])
+
+def open_door(user):
+    global open_hours, last_name, repeat_read_timeout, repeat_read_count
     now = time.time()
-    if (card_id == last_id and now <= repeat_read_timeout):
+    name = public_name(user)
+    if (name == last_name and now <= repeat_read_timeout):
         repeat_read_count += 1
     else:
         repeat_read_count = 0
-        repeat_read_timeout = now + 120
-    if (zone != "locker"):
-        if (users[card_id][zone] == "Yes"):
-            if (repeat_read_count >= 3):
-                open_hours = True
-                repeat_read_count = 0
-                report("%s is unlocked" % zone)
-            else:
-                if (open_hours == True):
-                    report("%s is locked" % zone)
-                open_hours = False
-            triggerRelay(config[zone]["Relay"], open_hours)
-            first, last = users[card_id]["Name"].split(" ")
-            report("%s %s. has entered %s" % (first, last[0], zone))
+        repeat_read_timeout = now + 30
+    last_name = name
+    if (repeat_read_count >= 2):
+        config[zone]["unlocked"] ^= True
+        if config[zone]["unlocked"]:
+            unlock(config[zone]["latch_gpio"])
+            report("%s unlocked by %s" % (zone, name))
         else:
-            report("A card was presented at %s and access was denied" % zone)
+            lock(config[zone]["latch_gpio"])
+            report("%s locked by %s" % (zone, name))
     else:
-        if (users[card_id]["locker"] is None):
-            return
-        userlocker = users[card_id]["locker"]
-        if (locker[userlocker]["Zone"] == lockerzone):
-            triggerRelay(locker[userlocker]["Relay"])
+        if config[zone]["unlocked"]:
+            report("%s found %s is already unlocked" % (name, zone))
+        else:
+            unlock_briefly(config[zone]["latch_gpio"])
+            report("%s has entered %s" % (name, zone))
 
 def cleanup(a=None, b=None):
-    report("Shutting down")
+    message = ""
+    if zone:
+        message = "%s " % zone
+    message += "access control is going offline"
+    report(message)
     GPIO.setwarnings(False)
     GPIO.cleanup()
-    proc.terminate()
     sys.exit(0)
 
-# Catch some exit signals
-signal.signal(signal.SIGINT, cleanup)   # Ctrl-C
-signal.signal(signal.SIGTERM, cleanup)  # killall python
-
-# Reload config files
-signal.signal(signal.SIGHUP, rehash)    # killall -HUP python
-signal.signal(signal.SIGUSR2, rehash)   # killall -USR2 python
-
-rehash()
-card_id = ""
-repeat_read_timeout = time.time()
+# Globalize some variables for later
+zone = None
+users = None
+config = None
+locker = None
+last_name = None
+lockerzone = None
+zone_by_pin = {}
 repeat_read_count = 0
-while True:
-    proc = subprocess.Popen(["./wiegand"],stdout=subprocess.PIPE)
-    try:
-        for line in iter(proc.stdout.readline, ""):
-            process_wiegand_line(line)
-    except Exception as inst:
-        print inst
-        proc.terminate()
+repeat_read_timeout = time.time()
 
-cleanup()
+initialize()
+while True:
+    # The main thread should open a command socket or something
+    time.sleep(1000)
