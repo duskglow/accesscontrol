@@ -177,13 +177,14 @@ def validate_bits(bstr):
 def lookup_card(card_id, facility, user_id):
     user = (users.get("%s,%s" % (facility, user_id)) or
             users.get(card_id) or
+            users.get(card_id.upper()) or
             users.get(user_id))
     if (user is None):
         debug("couldn't find user")
         return reject_card()
     if (zone == "locker" and user.get("locker")):
         open_locker(user)
-    elif (user.get(zone) and user[zone] == "Yes"):
+    elif (user.get(zone) and user[zone] == "authorized"):
         open_door(user)
     else:
         debug("user isn't authorized for this zone")

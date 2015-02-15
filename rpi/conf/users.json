@@ -1,12 +1,16 @@
 {
-	"<id>": {
-		"<zone>": "Yes",
-		"Name": "<name>",
-		"Locker": "<locker>"
+	"<id>|<facility>,<user>|<user>": {
+		"name": "<name>",
+		"<zone>": "authorized",
+		"locker": "<locker>"
 	},
-	"5": {
-		"maindoor": "Yes",
-		"Name": "John Doe",
-		"Locker": "3"
+	"0254008A": {
+		"name": "John Doe",
+		"maindoor": "authorized",
+		"locker": "3"
+	},
+	"42,69": {
+		"name": "Jane Doe",
+		"maindoor": "authorized"
 	}
 }
