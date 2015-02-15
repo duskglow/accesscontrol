@@ -109,6 +109,8 @@ def unlock_briefly(gpio):
 def setup_readers():
     global zone_by_pin
     for name in iter(config):
+        if name == "<zone>":
+            continue
         if (type(config[name]) is dict and config[name].get("d0")
                                        and config[name].get("d1")):
             reader = config[name]

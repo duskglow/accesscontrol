@@ -1,6 +1,6 @@
 {
 	"#": "Set zone to 'locker' or one of your zones from config.json",
-        "zone": "maindoor",
+	"zone": "maindoor",
 	"lockerzone": "locker1"
 }
 

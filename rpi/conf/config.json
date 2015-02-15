@@ -1,25 +1,25 @@
 {
 	"emailfrom": "access@yourdomain.com",
 	"emailto": "you@yourdomain.com",
-        "#": "Leave emailserver blank and no emails will be sent",
+	"#": "Leave emailserver blank and no emails will be sent",
 	"emailserver": "",
 	"emailport": 25,
 	"locker": {
 		"unlock_value": 0,
-                "open_delay": 2
+		"open_delay": 2
 	},
-        "<zone>": {
+	"<zone>": {
 		"unlock_value": "<1|0: writing this value unlocks the door>",
-                "open_delay": "<seconds to unlock door for>",
+		"open_delay": "<seconds to unlock door for>",
 		"latch_gpio": "<GPIO number>",
-                "d0": "<Wiegand DATA0 GPIO number>",
-                "d1": "<Wiegand DATA1 GPIO number>"
-        },
+		"d0": "<Wiegand DATA0 GPIO number>",
+		"d1": "<Wiegand DATA1 GPIO number>"
+	},
 	"maindoor": {
 		"unlock_value": 1,
-                "open_delay": 0.1,
+		"open_delay": 0.1,
 		"latch_gpio": 18,
-                "d0" : 23,
-                "d1" : 25
-	},
+		"d0": 23,
+		"d1": 25
+	}
 }
