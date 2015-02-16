@@ -35,7 +35,8 @@ def report(subject):
     syslog.syslog(subject)
     debug(subject)
     if config and config.get("emailserver"):
-        t = threading.Thread(target=send_email, args=(subject))
+        # The trailing comma in args=() below is required to truncate args
+        t = threading.Thread(target=send_email, args=(subject,))
         t.start()
 
 def debug(message):
